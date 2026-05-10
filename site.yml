@@ -1,0 +1,11 @@
+- name: Configure ServerA
+  hosts: webservers
+  become: yes
+  roles:
+    - serverA
+
+- name: Configure ServerB
+  hosts: clients
+  become: yes
+  roles:
+    - serverB

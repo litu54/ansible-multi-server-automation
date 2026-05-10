@@ -1,0 +1,37 @@
+---
+- name: Create web_mirror directory
+  file:
+    path: /opt/web_mirror
+    state: directory
+    mode: '0755'
+
+- name: Install curl
+  apt:
+    name: curl
+    state: present
+    update_cache: yes
+
+- name: Setup cron job to mirror sysinfo.html
+  cron:
+    name: "Mirror sysinfo.html from ServerA"
+    minute: "*/5"
+    job: "curl -s http://{{ hostvars['serverA']['ansible_host'] }}/sysinfo.html -o /opt/web_mirror/sysinfo.html"
+
+# Bonus tasks
+- name: Install Docker
+  apt:
+    name: docker.io
+    state: present
+    update_cache: yes
+
+- name: Run nginx container
+  community.docker.docker_container:
+    name: webmirror-nginx
+    image: nginx
+    state: started
+    restart_policy: always
+    published_ports:
+      - "8080:80"
+    volumes:
+      - /opt/web_mirror:/usr/share/nginx/html:ro
+

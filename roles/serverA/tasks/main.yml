@@ -1,0 +1,64 @@
+---
+- name: Create webteam group
+  group:
+    name: webteam
+    state: present
+
+- name: Create webadmin user
+  user:
+    name: webadmin
+    group: webteam
+    create_home: yes
+    state: present
+
+- name: Create website directory
+  file:
+    path: /srv/website
+    state: directory
+    owner: webadmin
+    group: webteam
+    mode: '0775'
+
+- name: Create sysinfo.html file
+  file:
+    path: /srv/website/sysinfo.html
+    state: touch
+    owner: webadmin
+    group: webteam
+    mode: '0664'
+
+- name: Populate sysinfo.html with system info
+  shell: |
+    {
+      echo "OS Version: $(lsb_release -d | cut -f2)"
+      echo "Kernel Version: $(uname -r)"
+      echo "Hostname: $(hostname)"
+      echo "CPU Info: $(lscpu | grep 'Model name' | cut -d: -f2)"
+      echo "Memory Usage: $(free -h | grep Mem)"
+      echo "Top 5 Listening TCP Ports:"
+      netstat -tulnp | grep LISTEN | head -n 5
+    } > /srv/website/sysinfo.html
+  args:
+    executable: /bin/bash
+
+- name: Install apache2
+  apt:
+    name: apache2
+    state: present
+    update_cache: yes
+
+- name: Configure Apache DocumentRoot
+  template:
+    src: apache-default.conf.j2
+    dest: /etc/apache2/sites-available/000-default.conf
+  notify: Reload apache
+
+- name: Disable firewall
+  service:
+    name: ufw
+    state: stopped
+    enabled: no
+
+- name: Set MTU size
+  command: ip link set dev {{ primary_interface }} mtu {{ mtu_size }}
+

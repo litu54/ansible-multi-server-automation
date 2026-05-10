@@ -1,0 +1,4 @@
+website_root: /srv/website
+mtu_size: 1500
+primary_interface: ens5
+
