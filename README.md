@@ -1,6 +1,6 @@
 # Multi-Server Automation Project using Ansible
 
-## Project Overview
+# Project Overview
 
 This project demonstrates infrastructure automation using Ansible across multiple Ubuntu servers hosted on AWS EC2.
 
@@ -12,12 +12,29 @@ The setup includes:
 
 ---
 
+# Initial Environment Setup
+
+Three Ubuntu 24.04 AWS EC2 instances were created for this project:
+
+* Control Node
+* ServerA
+* ServerB
+
+A common `ansible` user was created across all servers to standardize automation and SSH access.
+
+Passwordless SSH authentication was configured by generating SSH keys on the Control Node and exchanging public keys with the managed nodes.
+
+This enabled secure Ansible-based communication between the Control Node and managed servers.
+
+---
+
 # Architecture
 
 ## Control Node
 
 * Ubuntu 24.04 EC2
-* Runs Ansible playbooks
+* Ansible installed
+* Executes playbooks against managed nodes
 
 ## ServerA
 
@@ -28,42 +45,159 @@ The setup includes:
 ## ServerB
 
 * Mirrors `sysinfo.html` every 5 minutes using cron
-* Serves mirrored content through Dockerized NGINX
+* Hosts mirrored content using Dockerized NGINX
 
 ---
 
-# Technologies Used
+# Control Node Execution
 
-* Ansible
-* Apache2
-* Docker
-* NGINX
-* Cron
-* AWS EC2
-* Ubuntu 24.04
+All Ansible playbooks were executed from the Ansible Control Node.
+
+The Control Node manages:
+
+* ServerA
+* ServerB
+
+using SSH-based communication and inventory-driven automation.
 
 ---
 
-# Project Structure
+# AWS EC2 Setup
 
-```bash
-ansible-lab/
-├── inventory/
-│   └── hosts.ini
-├── roles/
-│   ├── serverA/
-│   └── serverB/
-├── site.yml
-└── README.md
+Created 3 Ubuntu 24.04 EC2 Instances:
+
+| Server       | Purpose               |
+| ------------ | --------------------- |
+| Control Node | Runs Ansible          |
+| ServerA      | Apache Server         |
+| ServerB      | Docker + NGINX Mirror |
+
+---
+
+# Security Group Configuration
+
+## Opened Ports
+
+| Port | Purpose                |
+| ---- | ---------------------- |
+| 22   | SSH                    |
+| 80   | Apache Access          |
+| 8080 | NGINX Container Access |
+
+---
+
+# Step 1 - Install Ansible on Control Node
+
+```bash id="s1"
+sudo apt update
+sudo apt install ansible -y
+```
+
+Verify:
+
+```bash id="s2"
+ansible --version
 ```
 
 ---
 
-# Inventory Configuration
+# Step 2 - Create Common Ansible User on All Servers
 
-File: `inventory/hosts.ini`
+Performed on:
 
-```ini
+* Control Node
+* ServerA
+* ServerB
+
+## Create User
+
+```bash id="s3"
+sudo useradd -m ansible
+sudo passwd ansible
+sudo usermod -aG sudo ansible
+```
+
+---
+
+# Step 3 - Configure Passwordless Sudo
+
+Edit sudoers:
+
+```bash id="s4"
+sudo visudo
+```
+
+Add:
+
+```bash id="s5"
+ansible ALL=(ALL) NOPASSWD: ALL
+```
+
+---
+
+# Step 4 - Generate SSH Key on Control Node
+
+Switch to ansible user:
+
+```bash id="s6"
+su - ansible
+```
+
+Generate key:
+
+```bash id="s7"
+ssh-keygen
+```
+
+---
+
+# Step 5 - Copy SSH Key to Managed Nodes
+
+From Control Node:
+
+```bash id="s8"
+ssh-copy-id ansible@<ServerA-Private-IP>
+ssh-copy-id ansible@<ServerB-Private-IP>
+```
+
+---
+
+# Step 6 - Validate SSH Connectivity
+
+```bash id="s9"
+ssh ansible@<ServerA-Private-IP>
+ssh ansible@<ServerB-Private-IP>
+```
+
+---
+
+# Step 7 - Create Ansible Project Structure
+
+```bash id="s10"
+mkdir -p ~/ansible-lab
+cd ~/ansible-lab
+```
+
+Create roles:
+
+```bash id="s11"
+ansible-galaxy init roles/serverA
+ansible-galaxy init roles/serverB
+```
+
+---
+
+# Step 8 - Create Inventory File
+
+File:
+
+```bash id="s12"
+inventory/hosts.ini
+```
+
+Content:
+
+```ini id="s13"
 [serverA]
 serverA ansible_host=<SERVERA_PRIVATE_IP>
 
@@ -76,49 +210,48 @@ ansible_user=ansible
 
 ---
 
-# Features Implemented
+# Step 9 - Create Main Playbook
 
-## ServerA
+File:
 
-* Creates `webteam` group
-* Creates `webadmin` user
-* Creates custom website directory
-* Generates dynamic system information page
-* Installs and configures Apache
-* Configures custom Apache DocumentRoot
-* Configures MTU size
+```bash id="s14"
+site.yml
+```
 
-## ServerB
+Content:
 
-* Creates mirror directory
-* Installs curl
-* Configures cron job for automatic mirroring
-* Installs Docker
-* Deploys Dockerized NGINX container
-* Serves mirrored content on port 8080
+```yaml id="s15"
+---
+- name: Configure ServerA
+  hosts: serverA
+  become: yes
+  roles:
+    - serverA
+
+- name: Configure ServerB
+  hosts: serverB
+  become: yes
+  roles:
+    - serverB
+```
 
 ---
 
-# Prerequisites
+# Step 10 - Install Required Collection
 
-* Ubuntu 24.04 EC2 instances
-* Ansible installed on Control Node
-* Passwordless SSH configured
-* Port 80 and 8080 opened in Security Groups
+On Control Node:
 
----
-
-# Install Required Collection
-
-```bash
+```bash id="s16"
 ansible-galaxy collection install community.docker
 ```
 
 ---
 
-# Run Playbook
+# Step 11 - Run Playbook
 
-```bash
+```bash id="s17"
+cd ~/ansible-lab
+
 ansible-playbook -i inventory/hosts.ini site.yml
 ```
 
@@ -128,13 +261,13 @@ ansible-playbook -i inventory/hosts.ini site.yml
 
 ## ServerA
 
-```text
+```text id="s18"
 http://<ServerA-Public-IP>/sysinfo.html
 ```
 
 ## ServerB
 
-```text
+```text id="s19"
 http://<ServerB-Public-IP>:8080/sysinfo.html
 ```
 
@@ -142,16 +275,37 @@ http://<ServerB-Public-IP>:8080/sysinfo.html
 
 # Troubleshooting Performed
 
-During implementation, the following issues were identified and resolved:
+## SSH Issues
 
-* SSH authentication issues
-* Sudo password prompts
-* Apache 404 errors
-* MTU interface mismatch (`eth0` vs `ens5`)
-* Hostname resolution issues
-* Docker dependency issues
-* NGINX 404 errors
-* AWS Security Group connectivity issues
+* Configured passwordless authentication
+* Added SSH public keys
+
+## Sudo Password Prompt
+
+* Added NOPASSWD entry in sudoers
+
+## Apache 404 Error
+
+* Fixed Apache DocumentRoot configuration
+* Reloaded Apache service
+
+## MTU Failure
+
+* Corrected network interface name from eth0 to ens5
+
+## NGINX 404 Error
+
+* Mirrored file was missing initially
+* Fixed cron job and hostname resolution
+
+## Docker Issues
+
+* Installed community.docker collection
+* Installed python3-docker package
+
+## Connectivity Issue
+
+* Opened port 80 in AWS Security Group
 
 ---
 
