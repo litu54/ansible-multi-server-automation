@@ -30,13 +30,16 @@
 - name: Populate sysinfo.html with system info
   shell: |
     {
+      echo "<html><body><pre>"
       echo "OS Version: $(lsb_release -d | cut -f2)"
       echo "Kernel Version: $(uname -r)"
       echo "Hostname: $(hostname)"
       echo "CPU Info: $(lscpu | grep 'Model name' | cut -d: -f2)"
       echo "Memory Usage: $(free -h | grep Mem)"
+      echo ""
       echo "Top 5 Listening TCP Ports:"
-      netstat -tulnp | grep LISTEN | head -n 5
+      ss -tulnp | grep LISTEN | head -n 5
+      echo "</pre></body></html>"
     } > /srv/website/sysinfo.html
   args:
     executable: /bin/bash
